@@ -1,4 +1,4 @@
-import React from 'react'; // Make sure React is imported in each component file
+import React from 'react'; 
 import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css'; // This import is fine here if this component is the only one using Leaflet
 
