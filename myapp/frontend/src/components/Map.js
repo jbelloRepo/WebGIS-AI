@@ -1,6 +1,6 @@
 import React from 'react'; 
 import { MapContainer, TileLayer } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css'; // This import is fine here if this component is the only one using Leaflet
+import 'leaflet/dist/leaflet.css';
 
 function Map() {
   return (
