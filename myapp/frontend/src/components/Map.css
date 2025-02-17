@@ -1,0 +1,104 @@
+/* Ensure map fills the container */
+.map-container {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  
+/* Leaflet container must also fill 100% */
+.map-container .leaflet-container {
+width: 100%;
+height: 100%;
+}
+
+/* Hide the Leaflet bar background/border */
+.leaflet-bar {
+background: transparent !important;
+border: none !important;
+box-shadow: none !important;
+}
+
+/* Hide default backgrounds/padding on the zoom control container */
+.leaflet-control-zoom {
+background-color: transparent !important;
+border: none !important;
+padding: 0 !important;
+margin: 0 !important;
+box-shadow: none !important;
+}
+
+/* Remove default link styling, then use pseudo-elements */
+.leaflet-control-zoom a {
+display: flex;
+align-items: center;
+justify-content: center;
+
+/* Adjust the button size if needed */
+width: 32px;
+height: 32px;
+
+/* Remove background, borders, etc. */
+background-color: transparent !important;
+border: none !important;
+box-shadow: none !important;
+margin: 0 !important;
+padding: 0 !important;
+
+/* Icon color and optional hover styles */
+color: #000 !important;
+}
+
+.leaflet-control-zoom a:hover {
+/* For example, a subtle background on hover */
+background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Inject Material icons via pseudo-elements */
+.leaflet-control-zoom-in::after,
+.leaflet-control-zoom-out::after {
+font-family: 'Material Icons';
+font-size: 24px;
+line-height: 1;
+content: ''; /* Default empty, we’ll override per selector */
+}
+
+/* Zoom-in button uses "zoom_in" */
+.leaflet-control-zoom-in::after {
+content: 'zoom_in';
+}
+
+/* Zoom-out button uses "zoom_out" */
+.leaflet-control-zoom-out::after {
+content: 'zoom_out';
+}
+  
+  
+* The custom control container (top-left) */
+.my-extra-icons a {
+  /* Make each icon a square button */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  margin-bottom: 4px; /* space between icons if stacked */
+
+  /* Dark gray background */
+  background-color: #333 !important; 
+  color: #fff !important;
+  text-decoration: none;
+  border-radius: 4px;
+  /* Optional box-shadow for a "button" look */
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+/* Hover effect: lighten the background slightly */
+.my-extra-icons a:hover {
+  background-color: #a3ccd6 !important;
+}
+
