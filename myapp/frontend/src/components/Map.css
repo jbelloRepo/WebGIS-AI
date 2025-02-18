@@ -77,7 +77,7 @@ content: 'zoom_out';
 }
   
   
-* The custom control container (top-left) */
+/* The custom control container (top-left) */
 .my-extra-icons a {
   /* Make each icon a square button */
   display: flex;
