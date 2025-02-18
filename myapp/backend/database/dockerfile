@@ -1,0 +1,21 @@
+# Use PostGIS image as the base
+FROM postgis/postgis:15-3.3
+
+# Install additional PostgreSQL extensions and utilities
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        postgresql-contrib \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy initialization scripts
+COPY ./init/ /docker-entrypoint-initdb.d/
+
+# Custom PostgreSQL configuration
+COPY ./config/postgresql.conf /etc/postgresql/postgresql.conf
+
+# Expose PostgreSQL port
+EXPOSE 5432
+
+# Set healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} || exit 1
