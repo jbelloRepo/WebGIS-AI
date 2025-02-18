@@ -1,4 +1,4 @@
-/* Reset all default margins and padding */
+
 *, *::before, *::after {
   margin: 0;
   padding: 0;
