@@ -1,0 +1,6 @@
+{
+    "Kitchener": {
+      "WaterMains": "https://services1.arcgis.com/qAo1OsXi67t7XgmS/arcgis/rest/services/Water_Mains/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json&resultRecordCount=2000"
+    }
+}
+  
