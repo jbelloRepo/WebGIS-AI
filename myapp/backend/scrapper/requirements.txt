@@ -1,0 +1,6 @@
+# Database
+psycopg2-binary==2.9.9
+
+# HTTP requests
+requests==2.31.0
+urllib3==2.2.0
