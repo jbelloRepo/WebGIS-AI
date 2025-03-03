@@ -4,7 +4,7 @@ services:
   postgis:
     build:
       context: ./myapp/backend/database
-      dockerfile: dockerfile
+      dockerfile: Dockerfile  # Ensure the correct case, Dockerfile not dockerfile
     container_name: postgis-db-service
     restart: always
     ports:
@@ -13,9 +13,9 @@ services:
       - postgis_data:/var/lib/postgresql/data
       - ./myapp/backend/database/init:/docker-entrypoint-initdb.d
     environment:
-      - POSTGRES_DB=gis_data
-      - POSTGRES_USER=gis_user
-      - POSTGRES_PASSWORD=password
+      POSTGRES_DB: gis_data
+      POSTGRES_USER: gis_user
+      POSTGRES_PASSWORD: password
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U gis_user -d gis_data"]
       interval: 10s
@@ -25,19 +25,38 @@ services:
   scraper:
     build:
       context: ./myapp/backend/scrapper
-      dockerfile: dockerfile
+      dockerfile: Dockerfile  # Ensure correct case
     container_name: python-scrapper-service
     depends_on:
       postgis:
         condition: service_healthy
     volumes:
-      - ./scrapper/logs:/app/logs
+      - ./myapp/backend/scrapper/logs:/app/logs  # Fixed volume path
     environment:
-      - PYTHONUNBUFFERED=1
-      - POSTGRES_DB=gis_data
-      - POSTGRES_USER=gis_user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_HOST=postgis-db-service
+      PYTHONUNBUFFERED: "1"
+      POSTGRES_DB: gis_data
+      POSTGRES_USER: gis_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST: postgis-db-service
+
+  api:
+    build:
+      context: ./myapp/backend/server
+      dockerfile: Dockerfile  # Ensure correct case
+    container_name: fastapi-service
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: gis_data
+      POSTGRES_USER: gis_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST: postgis-db-service
+      DATABASE_URL: postgresql+asyncpg://gis_user:password@postgis-db-service:5432/gis_data
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   postgis_data:
