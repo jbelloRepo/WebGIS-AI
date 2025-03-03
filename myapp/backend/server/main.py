@@ -1,11 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api.endpoints import watermains
-from .db.session import engine
-from .db import models
-
-# Create database tables
-models.Base.metadata.create_all(bind=engine)
+from api.endpoints import watermains
+from api.db.session import engine
+from api.db import models
+import asyncio
 
 app = FastAPI(title="WebGIS-AI API")
 
@@ -18,9 +16,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(watermains.router, prefix="/api/v1", tags=["watermains"])
+# Register routers
+app.include_router(watermains.router, prefix="/watermains", tags=["Water Mains"])
 
 @app.get("/")
-def read_root():
+async def root():
     return {"message": "Welcome to WebGIS-AI API"}
+
+# Create tables on startup
+@app.on_event("startup")
+async def init_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(models.Base.metadata.create_all)
