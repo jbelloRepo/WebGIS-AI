@@ -4,7 +4,7 @@ services:
   postgis:
     build:
       context: ./myapp/backend/database
-      dockerfile: Dockerfile  # Ensure the correct case, Dockerfile not dockerfile
+      dockerfile: Dockerfile  # Ensure the correct case
     container_name: postgis-db-service
     restart: always
     ports:
@@ -40,6 +40,7 @@ services:
       POSTGRES_HOST: postgis-db-service
 
   api:
+    platform: linux/amd64
     build:
       context: ./myapp/backend/server
       dockerfile: Dockerfile  # Ensure correct case
@@ -50,14 +51,49 @@ services:
     depends_on:
       postgis:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       POSTGRES_DB: gis_data
       POSTGRES_USER: gis_user
       POSTGRES_PASSWORD: password
       POSTGRES_HOST: postgis-db-service
       DATABASE_URL: postgresql+asyncpg://gis_user:password@postgis-db-service:5432/gis_data
+      REDIS_HOST: redis-cache
+      REDIS_PORT: 6379
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  qgis:
+    platform: linux/amd64
+    build:
+      context: ./myapp/backend/qgis
+      dockerfile: Dockerfile
+    container_name: qgis-service
+    volumes:
+      - ./myapp/backend/qgis:/app
+      - ./myapp/backend/qgis/output:/app/output
+    environment:
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      postgis:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      api:
+        condition: service_started
+
+  redis:
+    image: redis:latest
+    container_name: redis-cache
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
 
 volumes:
   postgis_data:
     name: postgis_data
+  redis_data:
+    name: redis_data
