@@ -1,0 +1,25 @@
+FROM qgis/qgis:latest
+
+# Set environment variables for QGIS
+ENV QGIS_PREFIX_PATH=/usr
+ENV QT_QPA_PLATFORM=offscreen
+ENV XDG_RUNTIME_DIR=/tmp/runtime-root
+ENV DISPLAY=:99
+
+# Install additional dependencies
+RUN apt-get update && apt-get install -y \
+    xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Create directory for output files and ensure it's writable
+RUN mkdir -p /app/output && chmod 777 /app/output
+
+COPY requirements.txt /app/
+COPY . /app
+
+# Start Xvfb and run the script
+CMD Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset & \
+    sleep 5 && \
+    python3 script.py
