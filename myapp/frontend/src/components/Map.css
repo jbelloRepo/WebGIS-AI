@@ -102,3 +102,68 @@ content: 'zoom_out';
   background-color: #a3ccd6 !important;
 }
 
+/* Add these styles to your existing Map.css */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 10px;
+  text-align: center;
+  z-index: 1000;
+}
+
+.error-message {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(220, 53, 69, 0.8);
+  color: white;
+  padding: 10px;
+  text-align: center;
+  z-index: 1000;
+}
+
+.popup-container {
+  padding: 5px;
+  max-width: 300px;
+}
+
+.popup-container h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: #3388ff;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+
+.popup-table {
+  width: 100%;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.popup-table td {
+  padding: 3px 0;
+}
+
+.popup-table tr td:first-child {
+  width: 40%;
+  color: #555;
+}
+
+.popup-loading {
+  padding: 10px;
+  text-align: center;
+  color: #666;
+}
+
+.popup-error {
+  padding: 10px;
+  text-align: center;
+  color: #d9534f;
+}
