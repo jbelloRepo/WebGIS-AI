@@ -91,6 +91,19 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
+    
+  frontend:
+    build:
+      context: ./myapp/frontend
+      dockerfile: dockerfile
+    container_name: react-frontend-service
+    restart: always
+    ports:
+      - "3000:80"  # Maps container's port 80 (nginx) to host's port 3000
+    depends_on:
+      - api
+    environment:
+      REACT_APP_API_URL: http://localhost:8000  # Points to the FastAPI backend
 
 volumes:
   postgis_data:
