@@ -25,7 +25,8 @@ from qgis.core import (
     QgsRasterLayer,
     QgsCoordinateTransform,
     QgsCoordinateReferenceSystem,
-    QgsProcessingFeedback
+    QgsProcessingFeedback,
+    QgsFeature
 )
 from qgis.PyQt.QtXml import QDomDocument
 import os
@@ -33,6 +34,10 @@ import os
 # Initialize QGIS Application
 qgs = QgsApplication([], False)
 qgs.initQgis()
+
+project = QgsProject.instance()
+project.setCrs(QgsCoordinateReferenceSystem("EPSG:2958"))
+
 
 # Initialize Processing
 sys.path.append('/usr/share/qgis/python/plugins')
@@ -203,7 +208,7 @@ def inspect_layer_features(layer, max_features=1):
     if max_features == 1:
         print("\n(Showing only first feature for brevity)")
 
-def create_print_layout(layer, template_path="/app/map_templates/watermain_layout.qpt", output_path="/app/output/water_mains.pdf", retry_count=0, max_retries=3):
+def create_print_layout(layer, template_path="/app/map_templates/watermain_layout_1.qpt", output_path="/app/output/water_mains.pdf", retry_count=0, max_retries=3):
     """
     Create a print layout using water mains data from PostGIS.
     
@@ -217,61 +222,35 @@ def create_print_layout(layer, template_path="/app/map_templates/watermain_layou
     try:
         # Get the layer's original CRS
         original_crs = layer.crs()
-        print(f"Using original layer CRS: {original_crs.authid()}")
-        
-        # Comment out reprojection of water mains layer
-        '''
-        # Set target CRS to EPSG:2958
-        target_crs = QgsCoordinateReferenceSystem('EPSG:2958')
-        
-        # Reproject water mains layer if needed
-        if layer.crs() != target_crs:
-            params = {
-                'INPUT': layer,
-                'TARGET_CRS': target_crs,
-                'OUTPUT': 'memory:'  # Store in memory instead of file
-            }
-            feedback = PrintingFeedback()
-            result = processing.run("native:reprojectlayer", params, feedback=feedback)
-            layer = result['OUTPUT']
-            QgsProject.instance().addMapLayer(layer)
-            
-            print("\n=== LAYER REPROJECTION ===")
-            print("Layer successfully reprojected to:", layer.crs().authid())
-            print("Reprojected layer feature count:", layer.featureCount())
-            inspect_layer_features(layer)  # Call the inspection function for detailed output
-        '''
+        print(f"===== def create_print_layout() ===== Layer CRS: {original_crs.authid()}")
         
         print(f"Layer CRS: {layer.crs().authid()}")
 
-        # Configure basemap - use a basemap that works with the original CRS
+        # Configure basemap - use OpenStreetMap
         uri = (
             "type=xyz&"
-            "url=https://abcd.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png&"
+            "url=https://tile.openstreetmap.org/{z}/{x}/{y}.png&"
             "zmax=19&"
             "zmin=0&"
             "format=PNG"
         )
 
         # Create basemap layer
-        basemap = QgsRasterLayer(uri, "CARTO Light", "wms")
+        basemap = QgsRasterLayer(uri, "OpenStreetMap", "wms")
         
         if not basemap.isValid():
             print(f"Failed to load basemap layer! Error: {basemap.error().message()}")
             return False
             
-        # Comment out basemap reprojection
-        '''
-        # Reproject basemap
-        params = {
-            'INPUT': basemap,
-            'TARGET_CRS': target_crs,
-            'OUTPUT': 'memory:'
-        }
-        feedback = PrintingFeedback()
-        result = processing.run("gdal:warpreproject", params, feedback=feedback)
-        basemap = result['OUTPUT']
-        '''
+        # Reproject basemap to match the vector layer's CRS if needed
+        if basemap.crs().authid() != layer.crs().authid():
+            print(f"Basemap CRS ({basemap.crs().authid()}) differs from layer CRS ({layer.crs().authid()})")
+            print("Reprojecting basemap to match layer CRS")
+            reprojected_basemap = reproject_raster_layer(basemap, layer.crs().authid())
+            if reprojected_basemap:
+                basemap = reprojected_basemap
+            else:
+                print("Warning: Basemap reprojection failed, using original basemap")
         
         QgsProject.instance().addMapLayer(basemap)
         
@@ -319,7 +298,7 @@ def create_print_layout(layer, template_path="/app/map_templates/watermain_layou
             return False
             
         # Add our layers to the map (basemap first, then water mains)
-        map_item.setLayers([basemap, layer])
+        map_item.setLayers([layer, basemap])
         
         # Get the extent in the correct CRS
         extent = layer.extent()
@@ -409,7 +388,7 @@ def style_water_mains(layer):
     for material, color in material_colors.items():
         symbol = QgsLineSymbol.createSimple({
             'line_color': color,
-            'line_width': '0.7'
+            'line_width': '0.3'
         })
         category = QgsRendererCategory(material, symbol, material)
         categories.append(category)
@@ -499,12 +478,201 @@ def load_water_mains_layer(retry_count=0, max_retries=5, delay=5):
             print(f"Max retries reached. Error: {str(e)}")
             return None
 
+def reproject_layer(layer, target_crs_string, transform_context=None):
+    """
+    Reproject a QGIS vector layer to a different coordinate reference system.
+    
+    Args:
+        layer (QgsVectorLayer): The layer to reproject
+        target_crs_string (str): The target CRS as a string (e.g., 'EPSG:4326')
+        transform_context (QgsCoordinateTransformContext, optional): Transform context for advanced transformations
+    
+    Returns:
+        QgsVectorLayer: The reprojected layer
+    """
+    try:
+        print("\n=== LAYER REPROJECTION STARTED ===")
+        print(f"Source layer: {layer.name()}")
+        print(f"Feature count: {layer.featureCount()}")
+        
+        # Create target CRS object
+        target_crs = QgsCoordinateReferenceSystem(target_crs_string)
+        
+        if not target_crs.isValid():
+            print(f"Error: Invalid target CRS: {target_crs_string}")
+            return None
+            
+        # Get the source CRS
+        source_crs = layer.crs()
+        print(f"Source CRS: {source_crs.authid()} - {source_crs.description()}")
+        print(f"Target CRS: {target_crs.authid()} - {target_crs.description()}")
+        
+        # If the layer is already in the target CRS, return it as is
+        if source_crs == target_crs:
+            print(f"Layer already in target CRS: {target_crs_string} - No reprojection needed")
+            return layer
+            
+        # Create a new layer name
+        new_layer_name = f"{layer.name()} ({target_crs_string})"
+        print(f"Creating new layer: {new_layer_name}")
+        
+        # Get the transform context if not provided
+        if transform_context is None:
+            print("Using project transform context")
+            transform_context = QgsProject.instance().transformContext()
+        else:
+            print("Using provided transform context")
+        
+        # Create the coordinate transform
+        transform = QgsCoordinateTransform(source_crs, target_crs, transform_context)
+        print(f"Transform created: {source_crs.authid()} → {target_crs.authid()}")
+        
+        # Use processing algorithm instead of manual feature copying
+        print("Using processing algorithm for reprojection")
+        params = {
+            'INPUT': layer,
+            'TARGET_CRS': target_crs,
+            'OUTPUT': 'memory:'  # Store in memory instead of file
+        }
+        feedback = PrintingFeedback()
+        result = processing.run("native:reprojectlayer", params, feedback=feedback)
+        new_layer = result['OUTPUT']
+        
+        # Verify the new layer
+        print(f"Reprojection complete. New layer has {new_layer.featureCount()} features")
+        print(f"New layer CRS: {new_layer.crs().authid()}")
+        
+        # Check for any feature loss
+        if new_layer.featureCount() != layer.featureCount():
+            print(f"Warning: Feature count mismatch! Original: {layer.featureCount()}, New: {new_layer.featureCount()}")
+        
+        # Set the layer name
+        new_layer.setName(new_layer_name)
+        
+        print("=== LAYER REPROJECTION COMPLETED ===\n")
+        return new_layer
+        
+    except Exception as e:
+        print(f"Error reprojecting layer: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return None
+
+def reproject_raster_layer(layer, target_crs_string, transform_context=None):
+    """
+    Reproject a QGIS raster layer to a different coordinate reference system.
+    
+    Args:
+        layer (QgsRasterLayer): The raster layer to reproject
+        target_crs_string (str): The target CRS as a string (e.g., 'EPSG:4326')
+        transform_context (QgsCoordinateTransformContext, optional): Transform context for advanced transformations
+    
+    Returns:
+        QgsRasterLayer: The reprojected raster layer
+    """
+    try:
+        print("\n=== RASTER LAYER REPROJECTION STARTED ===")
+        print(f"Source layer: {layer.name()}")
+        
+        # Create target CRS object
+        target_crs = QgsCoordinateReferenceSystem(target_crs_string)
+        
+        if not target_crs.isValid():
+            print(f"Error: Invalid target CRS: {target_crs_string}")
+            return None
+            
+        # Get the source CRS
+        source_crs = layer.crs()
+        print(f"Source CRS: {source_crs.authid()} - {source_crs.description()}")
+        print(f"Target CRS: {target_crs.authid()} - {target_crs.description()}")
+        
+        # If the layer is already in the target CRS, return it as is
+        if source_crs == target_crs:
+            print(f"Layer already in target CRS: {target_crs_string} - No reprojection needed")
+            return layer
+            
+        # Create a new layer name
+        new_layer_name = f"{layer.name()} ({target_crs_string})"
+        print(f"Creating new layer: {new_layer_name}")
+        
+        # For XYZ tile services, we need a different approach
+        if layer.providerType() == 'wms' and 'type=xyz' in layer.source():
+            print("Detected XYZ tile service - using on-the-fly reprojection")
+            
+            # For XYZ services, we'll create a new layer with the same source
+            # but set the desired CRS and let QGIS handle the reprojection
+            new_layer = QgsRasterLayer(layer.source(), new_layer_name, 'wms')
+            
+            if new_layer.isValid():
+                # Set the CRS explicitly
+                new_layer.setCrs(target_crs)
+                print(f"Created new XYZ layer with target CRS: {target_crs.authid()}")
+                print("=== RASTER LAYER REPROJECTION COMPLETED ===\n")
+                return new_layer
+            else:
+                print(f"Failed to create new XYZ layer: {new_layer.error().message()}")
+                print("Returning original layer")
+                return layer
+        
+        # For regular raster layers, use GDAL warp
+        try:
+            print("Using GDAL warp algorithm for raster reprojection")
+            params = {
+                'INPUT': layer,
+                'SOURCE_CRS': source_crs,
+                'TARGET_CRS': target_crs,
+                'RESAMPLING': 1,  # 0=nearest neighbor, 1=bilinear, 2=cubic, etc.
+                'NODATA': None,   # Leave as is
+                'TARGET_RESOLUTION': None,  # Use input resolution
+                'OPTIONS': '',
+                'DATA_TYPE': 0,   # Use input data type
+                'TARGET_EXTENT': None,  # Calculate automatically
+                'TARGET_EXTENT_CRS': None,
+                'MULTITHREADING': True,
+                'EXTRA': '',
+                'OUTPUT': 'memory:'  # Store in memory instead of file
+            }
+            
+            feedback = PrintingFeedback()
+            result = processing.run("gdal:warpreproject", params, feedback=feedback)
+            new_layer = result['OUTPUT']
+            
+            # Verify the new layer
+            print(f"Reprojection complete. New layer CRS: {new_layer.crs().authid()}")
+            
+            # Set the layer name
+            new_layer.setName(new_layer_name)
+            
+            print("=== RASTER LAYER REPROJECTION COMPLETED ===\n")
+            return new_layer
+        except Exception as gdal_error:
+            print(f"GDAL warp failed: {str(gdal_error)}")
+            print("Returning original layer")
+            return layer
+        
+    except Exception as e:
+        print(f"Error reprojecting raster layer: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return layer  # Return the original layer instead of None
+
 if __name__ == "__main__":
     try:
         # Load the water mains layer with retry logic
         layer = load_water_mains_layer()
         if layer:
-            # Set project CRS to match layer CRS instead of forcing EPSG:2958
+            # Reproject the layer to EPSG:2958 if needed
+            if layer.crs().authid() != 'EPSG:2958':
+                reprojected_layer = reproject_layer(layer, 'EPSG:2958')
+                if reprojected_layer:
+                    # Remove the original layer
+                    QgsProject.instance().removeMapLayer(layer.id())
+                    # Add the reprojected layer to the project
+                    QgsProject.instance().addMapLayer(reprojected_layer)
+                    # Use the reprojected layer for further operations
+                    layer = reprojected_layer
+            
+            # Set project CRS to match layer CRS
             project = QgsProject.instance()
             project.setCrs(layer.crs())
             
