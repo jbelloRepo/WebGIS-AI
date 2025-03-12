@@ -1,8 +1,9 @@
+// ExtraIconsControl.jsx
 import { useMap } from 'react-leaflet';
 import { useEffect } from 'react';
 import L from 'leaflet';
 
-function ExtraIconsControl() {
+function ExtraIconsControl({ onAiChatClick }) {
   const map = useMap();
 
   useEffect(() => {
@@ -12,13 +13,12 @@ function ExtraIconsControl() {
       options: { position: 'topleft' },
 
       onAdd: function (_map) {
-        // Create the container <div> with Leaflet's "leaflet-bar" class
+        // Create container <div> with Leaflet's "leaflet-bar" class
         const container = L.DomUtil.create('div', 'leaflet-bar my-extra-icons');
 
         // ========== 1. HOME ICON ==========
         const homeBtn = L.DomUtil.create('a', '', container);
         homeBtn.href = '#';
-        // Title for tooltip on hover
         homeBtn.title = 'Go to Home';
         homeBtn.innerHTML = `
           <span class="material-symbols-outlined">
@@ -28,14 +28,13 @@ function ExtraIconsControl() {
         L.DomEvent.on(homeBtn, 'click', (e) => {
           L.DomEvent.stop(e);
           console.log('Home clicked!');
-          // For example, reset map view:
           map.setView([43.4516, -80.4925], 9);
         });
 
         // ========== 2. ANALYTICS ICON ==========
         const analyticsBtn = L.DomUtil.create('a', '', container);
         analyticsBtn.href = '#';
-        analyticsBtn.title = 'View Analytics';  // tooltip
+        analyticsBtn.title = 'View Analytics';
         analyticsBtn.innerHTML = `
           <span class="material-symbols-outlined">
             bar_chart_4_bars
@@ -49,7 +48,7 @@ function ExtraIconsControl() {
         // ========== 3. AI CHAT ICON ==========
         const aiChatBtn = L.DomUtil.create('a', '', container);
         aiChatBtn.href = '#';
-        aiChatBtn.title = 'Open AI Chat';  // tooltip
+        aiChatBtn.title = 'Open AI Chat';
         aiChatBtn.innerHTML = `
           <span class="material-symbols-outlined">
             smart_toy
@@ -58,6 +57,8 @@ function ExtraIconsControl() {
         L.DomEvent.on(aiChatBtn, 'click', (e) => {
           L.DomEvent.stop(e);
           console.log('AI Chat clicked!');
+          // The callback we got from props
+          onAiChatClick();
         });
 
         return container;
@@ -72,7 +73,7 @@ function ExtraIconsControl() {
     return () => {
       map.removeControl(myControlInstance);
     };
-  }, [map]);
+  }, [map, onAiChatClick]);
 
   return null;
 }
