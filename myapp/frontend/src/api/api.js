@@ -42,4 +42,15 @@ export const fetchWaterMainById = async (id) => {
   }
 };
 
+// New chat API endpoint
+export const sendChatQuery = async (message) => {
+  try {
+    const response = await api.post('/chat/query', { message });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending chat query:', error);
+    throw error;
+  }
+};
+
 export default api; 
