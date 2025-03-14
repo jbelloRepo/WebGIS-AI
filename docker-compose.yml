@@ -61,6 +61,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://gis_user:password@postgis-db-service:5432/gis_data
       REDIS_HOST: redis-cache
       REDIS_PORT: 6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}  # Will use the value from .env
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   qgis:
