@@ -6,8 +6,10 @@ import asyncio
 import json
 import logging
 from sqlalchemy.sql import func  # Import SQL functions for geometry handling
+import os
+from dotenv import load_dotenv
 
-from api.endpoints import watermains
+from api.endpoints import watermains, chat  # Add chat import
 from api.db.session import engine
 from api.db import models
 from api.db.models import WaterMain
@@ -26,6 +28,7 @@ app.add_middleware(
 
 # Register API routes
 app.include_router(watermains.router, prefix="/watermains", tags=["Water Mains"])
+app.include_router(chat.router, prefix="/chat", tags=["Chat"])  # Add chat router
 
 # Retry Configuration
 MAX_RETRIES = 5
@@ -35,6 +38,9 @@ MAX_RETRY_DELAY = 60     # seconds
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file
+load_dotenv()
 
 @app.get("/")
 async def root():
