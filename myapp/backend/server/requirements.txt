@@ -8,3 +8,6 @@ geoalchemy2==0.14.1
 shapely==2.0.2
 numpy==1.24.3
 redis==5.0.1
+openai==1.66.3
+python-dotenv==1.0.0
+httpx==0.24.1
