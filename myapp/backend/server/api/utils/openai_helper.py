@@ -2,7 +2,7 @@ import os
 import openai
 from openai import OpenAI
 from openai import BadRequestError, RateLimitError, APIError, APITimeoutError
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import logging
 import re
 
@@ -12,17 +12,21 @@ api_key = os.getenv("OPENAI_API_KEY")
 # Initialize the OpenAI client with the API key
 client = OpenAI(api_key=api_key)
 
-def generate_sql_from_query(user_query: str, db_schema: str) -> str:
+def generate_sql_from_query(user_query: str, db_schema: str, chat_history: Optional[str] = None) -> str:
     """
     Uses OpenAI to convert a natural language query to SQL
     
     Args:
         user_query: The natural language query from the user
         db_schema: Description of the database schema
+        chat_history: Optional string containing previous conversation history
         
     Returns:
         A SQL query string (read-only). If an error or disallowed query, returns an empty string.
     """
+    # Check if this is a "show" query for map filtering
+    is_show_query = re.search(r'\b(show|display|highlight)\b', user_query.lower()) is not None
+    
     # System-level constraints to guide the LLM
     system_prompt = (
         "You are a helpful assistant that converts natural language questions to SQL queries.\n"
@@ -33,16 +37,48 @@ def generate_sql_from_query(user_query: str, db_schema: str) -> str:
         "4) The SQL should be read-only (SELECT statements or similar).\n"
     )
 
-    # User-level prompt: includes the database schema and the user's question
-    user_prompt = f"""
-    Given the following database schema:
-    {db_schema}
+    # Add chat history to the prompt if available
+    history_context = ""
+    if chat_history and chat_history.strip():
+        history_context = f"""
+        Previous conversation history:
+        {chat_history}
+        
+        Take this conversation history into account when generating SQL.
+        For example, if the user refers to "those water mains" or similar references, 
+        use the context from previous messages to infer what they mean.
+        """
 
-    Convert this question to a SQL query: "{user_query}"
+    # For show queries, modify prompt to only return object_ids
+    if is_show_query:
+        user_prompt = f"""
+        Given the following database schema:
+        {db_schema}
+        
+        {history_context}
 
-    Return ONLY the SQL query without any explanation.
-    Return ONLY the SQL without any triple backticks or markdown formatting.
-    """
+        The user wants to visually filter water mains with: "{user_query}"
+        Convert this to a SQL query that ONLY returns the object_id column.
+        The query must filter the water_mains table based on the request.
+
+        Example: For "show me cast iron pipe", return:
+        SELECT object_id FROM water_mains WHERE material = 'CAST IRON'
+
+        Return ONLY the SQL query without any explanation or formatting.
+        """
+    else:
+        # Regular query processing with history
+        user_prompt = f"""
+        Given the following database schema:
+        {db_schema}
+        
+        {history_context}
+
+        Convert this question to a SQL query: "{user_query}"
+
+        Return ONLY the SQL query without any explanation.
+        Return ONLY the SQL without any triple backticks or markdown formatting.
+        """
 
     try:
         response = client.chat.completions.create(
@@ -90,24 +126,38 @@ def generate_sql_from_query(user_query: str, db_schema: str) -> str:
         return ""
 
 
-def generate_response(query_result: Dict[str, Any], user_query: str) -> str:
+def generate_response(query_result: Dict[str, Any], user_query: str, chat_history: Optional[str] = None) -> str:
     """
     Generates a natural language response based on query results
     
     Args:
         query_result: The result of the SQL query (already executed)
         user_query: The original user query
+        chat_history: Optional string containing previous conversation history
 
     Returns:
         A natural language response explaining the data or any errors.
     """
     try:
         result_str = str(query_result)
+        
+        # Add chat history context if available
+        history_context = ""
+        if chat_history and chat_history.strip():
+            history_context = f"""
+            Previous conversation history:
+            {chat_history}
+            
+            Use this conversation history for context when generating your response.
+            If the user is referring to previous questions or topics, maintain that context.
+            """
 
         prompt = f"""
         Given this query result: {result_str}
 
         And the original question: "{user_query}"
+        
+        {history_context}
 
         Generate a friendly and informative response that answers the question.
         Note: If there is a list of any kind, make sure that each item in the list is on a new line.
@@ -140,3 +190,63 @@ def generate_response(query_result: Dict[str, Any], user_query: str) -> str:
     except Exception as e:
         logger.error(f"Error generating response: {str(e)}")
         return f"I found this result: {query_result}"
+
+
+def generate_map_update_response(count: int, user_query: str, chat_history: Optional[str] = None) -> str:
+    """
+    Generates a simpler response for 'show' queries without sending the full list of IDs
+    
+    Args:
+        count: The number of features found
+        user_query: The original user query
+        chat_history: Optional string containing previous conversation history
+
+    Returns:
+        A natural language response about the map update
+    """
+    try:
+        # Add chat history context if available
+        history_context = ""
+        if chat_history and chat_history.strip():
+            history_context = f"""
+            Previous conversation history:
+            {chat_history}
+            
+            Use this conversation history for context when generating your response.
+            """
+            
+        prompt = f"""
+        The user asked: "{user_query}"
+        
+        {history_context}
+        
+        This was a request to filter and display water mains on the map.
+        I found {count} water mains matching these criteria.
+        
+        Create a friendly response that:
+        1. Acknowledges the request to show certain water mains
+        2. Mentions that {count} features are now being displayed on the map
+        3. Suggests the user can click on individual water mains for more details
+        4. Keep it concise but friendly
+        """
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant for a GIS application."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=150  # Short response is sufficient
+        )
+
+        friendly_response = response.choices[0].message.content.strip()
+        logger.info(f"Map update response:\n{friendly_response}")
+        return friendly_response
+
+    except Exception as e:
+        logger.error(f"Error generating map update response: {str(e)}")
+        # Fallback response if API call fails
+        return f"I've updated the map to show {count} water mains matching your criteria. You can click on any highlighted feature for more details."
+
+
