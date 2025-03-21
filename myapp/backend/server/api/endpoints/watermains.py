@@ -8,7 +8,7 @@ from ..schemas import watermains as schemas
 from ..schemas.watermains import ObjectIDListRequest as GeometryRequest
 from ..db.models import WaterMain
 from ..db.session import get_db
-from ..db.redis_connection import redis_client  # Import Redis client
+from ..db.redis_connection import redis_client, store_id_list, get_ids_from_token
 
 router = APIRouter()
 
@@ -115,3 +115,36 @@ async def get_geometries_by_ids(request: GeometryRequest):
         raise HTTPException(status_code=404, detail="No geometries found for the provided IDs.")
     
     return geometries
+
+# Create a token for filter IDs
+@router.post("/filter-token", response_model=dict)
+async def create_filter_token(request: GeometryRequest):
+    """
+    Create a token that represents a list of object IDs for filtering.
+    Returns a token that can be used to retrieve the filtered geometries.
+    """
+    token = store_id_list(request.object_ids)
+    return {"token": token, "count": len(request.object_ids)}
+
+# Get geometries using a filter token
+@router.get("/cached/geometry/token/{token}", response_model=List[dict])
+async def get_cached_geometry_by_token(token: str):
+    """
+    Fetch geometries for a list of object_ids from Redis cache using a token.
+    """
+    id_list = get_ids_from_token(token)
+    if not id_list:
+        raise HTTPException(status_code=404, detail="Filter token not found or expired")
+    
+    cached_geometries = []
+    for obj_id in id_list:
+        cached_data = redis_client.hget("watermains:all", str(obj_id))
+        if cached_data:
+            watermain = json.loads(cached_data)
+            if "geometry" in watermain:
+                cached_geometries.append({"object_id": int(obj_id), "geometry": watermain["geometry"]})
+
+    if not cached_geometries:
+        raise HTTPException(status_code=404, detail="No matching geometries found in cache.")
+
+    return cached_geometries
