@@ -3,7 +3,7 @@ import { useMap } from 'react-leaflet';
 import { useEffect } from 'react';
 import L from 'leaflet';
 
-function ExtraIconsControl({ onAiChatClick }) {
+function ExtraIconsControl({ onAiChatClick, onLayersClick }) {
   const map = useMap();
 
   useEffect(() => {
@@ -31,18 +31,21 @@ function ExtraIconsControl({ onAiChatClick }) {
           map.setView([43.4516, -80.4925], 9);
         });
 
-        // ========== 2. ANALYTICS ICON ==========
-        const analyticsBtn = L.DomUtil.create('a', '', container);
-        analyticsBtn.href = '#';
-        analyticsBtn.title = 'View Analytics';
-        analyticsBtn.innerHTML = `
+        // ========== 2. LAYERS ICON ==========
+        const layersBtn = L.DomUtil.create('a', '', container);
+        layersBtn.href = '#';
+        layersBtn.title = 'View Layers';
+        layersBtn.innerHTML = `
           <span class="material-symbols-outlined">
-            bar_chart_4_bars
+            layers
           </span>
         `;
-        L.DomEvent.on(analyticsBtn, 'click', (e) => {
+        L.DomEvent.on(layersBtn, 'click', (e) => {
           L.DomEvent.stop(e);
-          console.log('Analytics clicked!');
+          console.log('Layers clicked!');
+          if (onLayersClick) {
+            onLayersClick();
+          }
         });
 
         // ========== 3. AI CHAT ICON ==========
@@ -73,7 +76,7 @@ function ExtraIconsControl({ onAiChatClick }) {
     return () => {
       map.removeControl(myControlInstance);
     };
-  }, [map, onAiChatClick]);
+  }, [map, onAiChatClick, onLayersClick]);
 
   return null;
 }
