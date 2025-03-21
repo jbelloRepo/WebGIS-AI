@@ -63,7 +63,7 @@ background-color: rgba(255, 255, 255, 0.1) !important;
 font-family: 'Material Icons';
 font-size: 24px;
 line-height: 1;
-content: ''; /* Default empty, we’ll override per selector */
+content: ''; /* Default empty, we'll override per selector */
 }
 
 /* Zoom-in button uses "zoom_in" */
@@ -167,3 +167,38 @@ content: 'zoom_out';
   text-align: center;
   color: #d9534f;
 }
+
+.filter-indicator {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #f0f8ff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 2px solid #3388ff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2), 0 0 0 3px rgba(51,136,255,0.1);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 180px;
+  font-weight: bold;
+  font-size: 16px;
+  color: #1a1a1a;
+  animation: fadeIn 0.3s ease-in;
+}
+
+.filter-indicator button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  margin-left: 10px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px) translateX(-50%); }
+  to { opacity: 1; transform: translateY(0) translateX(-50%); }
+}
+
