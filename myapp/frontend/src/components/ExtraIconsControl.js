@@ -3,7 +3,7 @@ import { useMap } from 'react-leaflet';
 import { useEffect } from 'react';
 import L from 'leaflet';
 
-function ExtraIconsControl({ onAiChatClick, onLayersClick }) {
+function ExtraIconsControl({ onAiChatClick, onLayersClick, onAddDatasetClick }) {
   const map = useMap();
 
   useEffect(() => {
@@ -64,6 +64,23 @@ function ExtraIconsControl({ onAiChatClick, onLayersClick }) {
           onAiChatClick();
         });
 
+        // ========== 4. ADD DATASET ICON ==========
+        const addDatasetBtn = L.DomUtil.create('a', '', container);
+        addDatasetBtn.href = '#';
+        addDatasetBtn.title = 'Add Dataset';
+        addDatasetBtn.innerHTML = `
+          <span class="material-symbols-outlined">
+            add_link
+          </span>
+        `;
+        L.DomEvent.on(addDatasetBtn, 'click', (e) => {
+          L.DomEvent.stop(e);
+          console.log('Add Dataset clicked!');
+          if (onAddDatasetClick) {
+            onAddDatasetClick();
+          }
+        });
+
         return container;
       },
     });
@@ -76,7 +93,7 @@ function ExtraIconsControl({ onAiChatClick, onLayersClick }) {
     return () => {
       map.removeControl(myControlInstance);
     };
-  }, [map, onAiChatClick, onLayersClick]);
+  }, [map, onAiChatClick, onLayersClick, onAddDatasetClick]);
 
   return null;
 }
