@@ -6,6 +6,7 @@ import { fetchWaterMainGeometries, fetchWaterMainById, fetchWaterMainGeometriesB
 import ExtraIconsControl from './ExtraIconsControl';
 import ChatWindow from './ChatWindow';
 import LayerControl from './LayerControl';
+import AddDatasetDialog from './AddDatasetDialog';
 import './Map.css';
 
 // Component to handle zoom to bounds
@@ -25,6 +26,7 @@ function Map() {
   const kitchenerCoordinates = [43.4516, -80.4925];
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isLayerControlOpen, setIsLayerControlOpen] = useState(false);
+  const [isAddDatasetOpen, setIsAddDatasetOpen] = useState(false);
   const [waterMains, setWaterMains] = useState([]);
   const [filteredWaterMains, setFilteredWaterMains] = useState([]);
   const [isFiltered, setIsFiltered] = useState(false);
@@ -319,6 +321,20 @@ function Map() {
   //   }
   // }, [messages]); // Trigger when messages change
 
+  const handleAddDatasetClick = () => {
+    setIsAddDatasetOpen(true);
+    // Close other panels
+    setIsChatOpen(false);
+    setIsLayerControlOpen(false);
+  };
+
+  const handleDatasetAdded = () => {
+    // Refresh data after a new dataset is added
+    // This is where you would fetch updated datasets
+    console.log('Dataset added successfully');
+    // Optionally reload data or update state as needed
+  };
+
   return (
     <div className="map-container">
       {isLoading && <div className="loading-overlay">Loading water mains data...</div>}
@@ -335,7 +351,7 @@ function Map() {
         {getLayerVisibility('baseMap') && (
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+            attribution='&copy; <a href="https://carto.com/attributions">CARTO</a> : Contains information licensed under the Open Government Licence - The Corporation of the City of Kitchener.'
             subdomains="abcd"
             maxZoom={19}
           />
@@ -384,7 +400,8 @@ function Map() {
         {/* Our 3-icon custom control pinned to top-left */}
         <ExtraIconsControl 
           onAiChatClick={handleAiChatClick}
-          onLayersClick={handleLayersClick} 
+          onLayersClick={handleLayersClick}
+          onAddDatasetClick={handleAddDatasetClick}
         />
       </MapContainer>
 
@@ -394,6 +411,13 @@ function Map() {
         onClose={() => setIsLayerControlOpen(false)}
         layers={layers}
         onToggleLayer={handleToggleLayer}
+      />
+
+      {/* Add Dataset Dialog */}
+      <AddDatasetDialog
+        open={isAddDatasetOpen}
+        onClose={() => setIsAddDatasetOpen(false)}
+        onSuccess={handleDatasetAdded}
       />
 
       {/* Filter indicator */}
