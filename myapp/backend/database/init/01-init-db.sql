@@ -60,3 +60,31 @@ CREATE TRIGGER update_water_mains_updated_at
     BEFORE UPDATE ON water_mains
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Create dataset_configs table
+CREATE TABLE IF NOT EXISTS dataset_configs (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,                -- Dataset name (e.g., "Roads", "Water Mains")
+    base_url VARCHAR(500) NOT NULL,            -- Base REST endpoint URL
+    geometry_type VARCHAR(50) NOT NULL,        -- e.g., "esriGeometryPolyline"
+    table_name VARCHAR(100) NOT NULL UNIQUE,   -- Dynamic table name to store the data
+    server_metadata JSONB NOT NULL,            -- Complete server metadata from ?f=pjson
+    generated_schema JSONB NOT NULL,           -- AI-generated schema based on watermains template
+    display_field VARCHAR(100),                -- Main field to display
+    description TEXT,                          -- Dataset description
+    min_scale INTEGER,                         -- Minimum scale for display
+    max_scale INTEGER,                         -- Maximum scale for display
+    max_record_count INTEGER,                  -- Maximum records per query
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for JSON fields
+CREATE INDEX idx_dataset_configs_metadata ON dataset_configs USING GIN (server_metadata);
+CREATE INDEX idx_dataset_configs_schema ON dataset_configs USING GIN (generated_schema);
+
+-- Create update trigger for dataset_configs updated_at
+CREATE TRIGGER update_dataset_configs_updated_at
+    BEFORE UPDATE ON dataset_configs
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
