@@ -9,26 +9,33 @@ from sqlalchemy.sql import func  # Import SQL functions for geometry handling
 import os
 from dotenv import load_dotenv
 
-from api.endpoints import watermains, chat  # Add chat import
+from api.endpoints import watermains, chat, datasets  # Add datasets import
 from api.db.session import engine
 from api.db import models
 from api.db.models import WaterMain
 from api.db.redis_connection import redis_client
 
-app = FastAPI(title="WebGIS-AI API")
+app = FastAPI(
+    title="WebGIS AI API",
+    description="API for WebGIS AI application",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Register API routes
-app.include_router(watermains.router, prefix="/watermains", tags=["Water Mains"])
-app.include_router(chat.router, prefix="/chat", tags=["Chat"])  # Add chat router
+app.include_router(watermains.router, prefix="/watermains", tags=["watermains"])
+app.include_router(chat.router, prefix="/chat", tags=["chat"])
+app.include_router(datasets.router, prefix="/datasets", tags=["datasets"])  # Add datasets router
 
 # Retry Configuration
 MAX_RETRIES = 5
