@@ -117,4 +117,31 @@ export const fetchWaterMainsByToken = async (token) => {
   }
 };
 
+export const fetchDatasets = async () => {
+  try {
+    const response = await api.get('/datasets');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching datasets:', error);
+    throw error;
+  }
+};
+
+export const validateArcGISEndpoint = async (url) => {
+  try {
+    const response = await fetch(url + '?f=json');
+    if (!response.ok) {
+      throw new Error('Invalid ArcGIS endpoint');
+    }
+    const data = await response.json();
+    if (!data.type || !data.geometryType) {
+      throw new Error('Invalid ArcGIS service endpoint');
+    }
+    return data;
+  } catch (error) {
+    console.error('Error validating ArcGIS endpoint:', error);
+    throw error;
+  }
+};
+
 export default api; 
