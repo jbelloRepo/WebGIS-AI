@@ -144,4 +144,19 @@ export const validateArcGISEndpoint = async (url) => {
   }
 };
 
+
+// NEW: Fetch all registered datasets from /datasets
+export const fetchAllDatasets = async () => {
+  const res = await api.get('/datasets');
+  console.log('==ENDPOINT: fetchAllDatasets [147]==> Fetched all datasets:', res);
+  return res.data; // an array of dataset configs
+};
+
+// NEW: Fetch data for a specific dataset from /datasets/{table_name}/data
+export const fetchDatasetData = async (table_name) => {
+  const res = await api.get(`/datasets/${table_name}/data`);
+  console.log('==ENDPOINT: fetchDatasetData [151]==> Fetched dataset data:', res);
+  return res.data; // an array of features
+};
+
 export default api; 
