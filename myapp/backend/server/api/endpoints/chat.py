@@ -17,7 +17,8 @@ from ..utils.openai_helper import (
 from ..services.sql_executor import execute_sql_query
 from ..services.chat_service import (
     create_chat_session, get_chat_session, create_chat_message, 
-    get_chat_history, prepare_chat_history_for_context, extract_metadata_from_response
+    get_chat_history, prepare_chat_history_for_context, extract_metadata_from_response,
+    get_all_chat_history
 )
 
 router = APIRouter()
@@ -67,15 +68,16 @@ async def create_new_chat_session(
 ):
     """Create a new chat session"""
     if session_data is None:
+        logger.info("==[1 chat/session ENDPOINT]==: session_data is None")
         session_data = ChatSessionCreate()
+        logger.info("==[2 chat/session ENDPOINT]==: session_data created, session_data: %s", session_data)
     
     try:
         session = await create_chat_session(db, session_data)
-        return ChatSessionResponse(
-            session_id=session.session_id,
-            created_at=session.created_at,
-            updated_at=session.updated_at
-        )
+        logger.info("==[3 chat/session ENDPOINT]==: session created, session: %s", session)
+        
+        return ChatSessionResponse(session_id=session.session_id,created_at=session.created_at,updated_at=session.updated_at)
+        
     except Exception as e:
         logger.error(f"Error creating chat session: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -105,67 +107,71 @@ async def process_chat_query(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Process a user's chat query by:
+      1) Creating/ensuring a chat session
+      2) Loading the chat history
+      3) Generating a SQL query from user input
+      4) Running that query & returning a friendly response
+    """
     try:
+        # 1) Parse the request
         user_query = request.message
         session_id = request.session_id
         logger.info(f"Received chat query: {user_query}")
-        
-        # Create or get chat session
+
+        # 2) Create or retrieve the user's chat session
         if not session_id:
-            session = await create_chat_session(db, ChatSessionCreate())
-            session_id = session.session_id
+            # session = await create_chat_session(db, ChatSessionCreate())
+            # session_id = session.session_id
+            logger.info("==[1 chat/query ENDPOINT]==: session_id is None")
         else:
             session = await get_chat_session(db, session_id)
             if not session:
-                # Create a new session if the provided ID doesn't exist
-                session = await create_chat_session(db, ChatSessionCreate())
-                session_id = session.session_id
+                # If the provided session_id doesn't exist, create a new session
+                # session = await create_chat_session(db, ChatSessionCreate())
+                # session_id = session.session_id
+                logger.info("==[2 chat/query ENDPOINT]==: session_id exists, session: %s", session)
         
-        # Get chat history for context
-        chat_messages = await get_chat_history(db, session_id)
+        # 3) Load chat history from ALL sessions instead of just the current one
+        chat_messages = await get_all_chat_history(db)
+        
+        # 4) Prepare conversation text for the LLM
         chat_history = prepare_chat_history_for_context(chat_messages)
-        
-        # Save user message
+        logger.info(f"Chat history: {chat_history}")
+
+        # 5) Record the new user message in the DB
         user_message = ChatMessageCreate(
             session_id=session_id,
             message_type="user",
             content=user_query
         )
         await create_chat_message(db, user_message)
-        
-        # Check if this is a "show" query for map filtering
+
+        # 6) Check if "show" query for map filtering
         is_show_query = re.search(r'\b(show|display|highlight)\b', user_query.lower()) is not None
-        
-        # Generate SQL from natural language with chat history context
+
+        # 7) Generate SQL from user_query + combined chat history
         sql_query = generate_sql_from_query(user_query, DB_SCHEMA, chat_history)
         if not sql_query:
             raise HTTPException(status_code=400, detail="Failed to generate SQL query")
-        
-        # Execute the SQL query
+
+        # 8) Execute the SQL query
         query_result = await execute_sql_query(db, sql_query)
-        logger.info(f"Query result type: {type(query_result)}")
         logger.info(f"Query result: {query_result}")
-        
-        # For show queries, extract object_ids but generate a simpler response
+
+        # 9) Build a user-friendly response
         filter_ids = None
         if is_show_query and "result" in query_result and isinstance(query_result["result"], list):
-            # If we have results and the SQL was for a show query, extract IDs for filtering
+            # "Show" queries: we might only return object_ids
             result_list = query_result["result"]
-            if result_list and isinstance(result_list, list) and len(result_list) > 0:
-                if "object_id" in result_list[0]:
-                    # Get IDs for filtering map
-                    filter_ids = [item["object_id"] for item in result_list if "object_id" in item]
-                    
-                    # For show queries, we want a simpler response that's tailored to the map view
-                    response_text = generate_map_update_response(len(filter_ids), user_query, chat_history)
-                else:
-                    # Handle case where object_id is not in the results
-                    response_text = "I couldn't find any water mains matching your criteria."
+            if result_list and isinstance(result_list[0], dict) and "object_id" in result_list[0]:
+                filter_ids = [item["object_id"] for item in result_list]
+                response_text = generate_map_update_response(len(filter_ids), user_query, chat_history)
             else:
-                # Empty result case
                 response_text = "I couldn't find any water mains matching your criteria."
         else:
-            # For analytical queries, generate a more detailed response from the results
+            # Normal queries
             if "error" in query_result:
                 response_text = f"I encountered an error: {query_result['error']}"
             elif "result" in query_result:
@@ -173,23 +179,21 @@ async def process_chat_query(
                 if result == "No data found":
                     response_text = "I couldn't find any data matching your criteria."
                 else:
-                    # Generate a natural language response based on the data
                     response_text = generate_response(query_result, user_query, chat_history)
             else:
                 response_text = "I couldn't process your query."
 
-        # Extract and limit the data for the frontend
+        # 10) Limit results for front-end
         data_for_frontend = {}
         if "result" in query_result and isinstance(query_result["result"], list):
             full_result_list = query_result["result"]
-            # Limit to first 100 items to avoid overwhelming the frontend
             limited_results = full_result_list[:100]
             data_for_frontend = {
                 "results": limited_results,
                 "total_count": len(full_result_list)
             }
-        
-        # Create response object
+
+        # 11) Prepare final ChatResponse
         response = ChatResponse(
             response=response_text,
             data=data_for_frontend,
@@ -197,8 +201,8 @@ async def process_chat_query(
             is_show_query=is_show_query,
             session_id=session_id
         )
-        
-        # Save AI message with metadata
+
+        # 12) Save assistant's reply as an AI message
         ai_message = ChatMessageCreate(
             session_id=session_id,
             message_type="ai",
@@ -209,9 +213,9 @@ async def process_chat_query(
             })
         )
         await create_chat_message(db, ai_message)
-        
+
         return response
-    
+
     except Exception as e:
         logger.error(f"Error processing chat query: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
