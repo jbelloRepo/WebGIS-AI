@@ -68,23 +68,38 @@ async def get_chat_history(db: AsyncSession, session_id: str, limit: int = 50) -
         logger.error(f"Error getting chat history: {str(e)}")
         raise
 
+async def get_all_chat_history(db: AsyncSession, limit: int = 500000) -> List[ChatMessage]:
+    """Get chat history across all sessions."""
+    try:
+        result = await db.execute(
+            select(ChatMessage)
+            .order_by(ChatMessage.created_at)
+            .limit(limit)
+        )
+        return result.scalars().all()
+    except Exception as e:
+        logger.error(f"Error getting all chat history: {str(e)}")
+        raise
+
 def prepare_chat_history_for_context(messages: List[ChatMessage]) -> str:
     """
-    Format chat history as a string for use in AI context.
-    
-    Example:
-    User: How many water mains are there?
-    AI: There are 1,203 water mains in the database.
+    Format chat messages into a string to provide context for OpenAI.
+    Now includes system messages in the context.
     """
-    if not messages:
-        return ""
+    formatted_history = ""
     
-    history = []
     for msg in messages:
-        role = "User" if msg.message_type == "user" else "AI"
-        history.append(f"{role}: {msg.content}")
+        if msg.message_type == "user":
+            formatted_history += f"User: {msg.content}\n\n"
+        elif msg.message_type == "ai":
+            formatted_history += f"Assistant: {msg.content}\n\n"
+        elif msg.message_type == "system":
+            # Include system messages in the context
+            formatted_history += f"{msg.content}\n\n"
     
-    return "\n".join(history)
+    logger.info(f"\n [prepare_chat_history_for_context] ==||Formatted chat history ||==: {formatted_history}\n")
+    
+    return formatted_history
 
 def extract_metadata_from_response(response_data: Dict[str, Any]) -> str:
     """
