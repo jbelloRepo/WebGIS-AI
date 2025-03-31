@@ -52,7 +52,7 @@ class ChatMessage(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(String(36), ForeignKey("chat_sessions.session_id"), nullable=False)
-    message_type = Column(String(10), nullable=False)  # "user" or "ai"
+    message_type = Column(String(10), nullable=False)  # "user", "ai", or "system"
     content = Column(Text, nullable=False)
     created_at = Column(TIMESTAMP, default=datetime.utcnow)
     message_metadata = Column(Text, nullable=True)  # Store additional information like filter IDs as JSON
