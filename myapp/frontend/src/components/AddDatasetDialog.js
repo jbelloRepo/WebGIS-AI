@@ -36,6 +36,13 @@ function AddDatasetDialog({ open, onClose, onSuccess }) {
     setError(null);
   }, [url]);
 
+  // Add this to check if sessionId is actually available
+  useEffect(() => {
+    const currentSessionId = localStorage.getItem('chatSessionId');
+    console.log("Current session ID from localStorage:", currentSessionId);
+    // If no session ID, we could potentially create one here
+  }, []);
+
   const checkStatus = async (tableName) => {
     try {
       const response = await api.get(`/datasets/${tableName}/status`);
@@ -54,13 +61,14 @@ function AddDatasetDialog({ open, onClose, onSuccess }) {
           enqueueSnackbar('Creating database table...', { variant: 'info' });
           break;
         case 'loading':
-          // Progress is already shown in the dialog
+          // Progress is shown in the dialog
           break;
         case 'complete':
           clearInterval(statusCheckInterval.current);
           setLoading(false);
           enqueueSnackbar('Dataset loaded successfully!', { variant: 'success' });
-          onSuccess();
+          // This is where we notify the parent that the dataset is done
+          onSuccess(); 
           onClose();
           break;
         case 'error':
@@ -78,11 +86,11 @@ function AddDatasetDialog({ open, onClose, onSuccess }) {
     }
   };
 
-  // Function to validate if a URL is valid
+  // Function to check if URL is valid
   const isValidUrl = (url) => {
     try {
       new URL(url);
-      // Check if it's potentially an ArcGIS URL (basic check)
+      // Check if it's ArcGIS-like
       return url.includes('arcgis.com') || 
              url.includes('FeatureServer') || 
              url.includes('MapServer');
@@ -94,6 +102,10 @@ function AddDatasetDialog({ open, onClose, onSuccess }) {
   const validateAndSubmit = async (e) => {
     e.preventDefault();
     
+    // Get the latest sessionId value right before sending
+    const currentSessionId = localStorage.getItem('chatSessionId');
+    console.log("Session ID at submission time:", currentSessionId);
+    
     if (!isValidUrl(url)) {
       setError('Please enter a valid ArcGIS REST service URL');
       return;
@@ -104,22 +116,23 @@ function AddDatasetDialog({ open, onClose, onSuccess }) {
     setError(null);
     
     try {
-      // First validate the ArcGIS endpoint
+      // Validate the ArcGIS endpoint
       enqueueSnackbar('Validating ArcGIS endpoint...', { variant: 'info' });
       await validateArcGISEndpoint(url);
       
-      // If validation passes, submit the dataset
+      // Register the dataset with the latest session ID
       const response = await api.post('/datasets/register', { 
         base_url: url,
         name,
-        table_name: name.toLowerCase().replace(/\s+/g, '_')
+        table_name: name.toLowerCase().replace(/\s+/g, '_'),
+        session_id: currentSessionId  // Use the latest value
       });
 
       const data = response.data;
       setStatus('initializing');
       enqueueSnackbar('Dataset registration started...', { variant: 'info' });
       
-      // Start polling for status
+      // Poll for status every 2s
       statusCheckInterval.current = setInterval(
         () => checkStatus(data.table_name),
         2000
@@ -225,4 +238,4 @@ function AddDatasetDialog({ open, onClose, onSuccess }) {
   );
 }
 
-export default AddDatasetDialog; 
+export default AddDatasetDialog;
