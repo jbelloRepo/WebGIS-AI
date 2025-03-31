@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 import requests
 import logging
@@ -10,6 +10,9 @@ import logging
 from ..db.session import get_db
 from ..services.dataset_service import register_dataset, get_dataset_config
 from ..db.redis_connection import redis_client
+from ..services.chat_service import create_chat_session, get_chat_session
+from ..schemas.chat import ChatSessionCreate
+
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -25,6 +28,7 @@ class DatasetRegistration(BaseModel):
     name: str
     base_url: str
     table_name: str
+    session_id: Optional[str] = None
 
 class DatasetResponse(BaseModel):
     id: int | None = None
@@ -225,13 +229,39 @@ async def register_new_dataset(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
+    logger.info("\n ==>THE SESSION PASSED FROM FRONTEND<==: %s", dataset.session_id)
     """
     Register a new dataset (table + schema) and start ingestion in the background.
     """
     logger.info("[20] Starting dataset registration. Name: %s, URL: %s", dataset.name, dataset.base_url)
     try:
-        # 1) Actually register the dataset (inserts row, creates table, etc.)
-        config = await register_dataset(db, dataset.name, dataset.base_url, dataset.table_name)
+        # Use the session ID from the request, falling back to global if not provided
+        session_id = dataset.session_id
+        logger.info("[20a] Session ID: %s", session_id)
+        
+        # Get or create a session_id if none is provided
+        if not session_id:
+            # Create a new session as a last resort
+            session = await create_chat_session(db, ChatSessionCreate())
+            session_id = session.session_id
+            logger.info("[21c] Created new session: %s", session_id)
+        else:
+            # Verify the session exists
+            session = await get_chat_session(db, session_id)
+            if not session:
+                # If the session doesn't exist, create a new one
+                session = await create_chat_session(db, ChatSessionCreate())
+                session_id = session.session_id
+                logger.info("[21b] Created new session: %s", session_id)
+            
+        # 1) Actually register the dataset with the session_id
+        config = await register_dataset(
+            db, 
+            dataset.name, 
+            dataset.base_url, 
+            dataset.table_name,
+            session_id  # Pass along the session_id
+        )
         
         # 2) Start the background ingestion job
         background_tasks.add_task(fetch_and_store_data, db, config)
@@ -253,15 +283,21 @@ async def list_datasets(db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(text("SELECT * FROM dataset_configs"))
         rows = result.fetchall()
+        logger.info("<==ENDPOINT: list_datasets [256]==> Fetched %d datasets", len(rows))
 
-        # Construct a DatasetResponse for each row
         datasets = []
         for ds in rows:
-            # ds is a SQLAlchemy Row
-            ds_dict = dict(ds)
-            # We parse the generated_schema to attach as 'schema'
-            gen_schema = json.loads(ds_dict['generated_schema']) if ds_dict.get('generated_schema') else {}
-            
+            ds_dict = dict(ds._mapping)
+
+            # if generated_schema is a string, parse it; if it's already a dict, use it directly
+            raw_schema = ds_dict.get('generated_schema')
+            if isinstance(raw_schema, str):
+                gen_schema = json.loads(raw_schema)
+            elif isinstance(raw_schema, dict):
+                gen_schema = raw_schema
+            else:
+                gen_schema = {}
+
             datasets.append(DatasetResponse(
                 id=ds_dict['id'],
                 name=ds_dict['name'],
@@ -272,6 +308,8 @@ async def list_datasets(db: AsyncSession = Depends(get_db)):
                 description=ds_dict['description'],
                 schema=gen_schema
             ))
+
+        logger.info("<==ENDPOINT: list_datasets [260]==> datasets: %s", datasets)
         return datasets
     except Exception as e:
         logger.error("Failed to list datasets: %s", str(e))
