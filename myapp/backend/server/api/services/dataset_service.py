@@ -188,17 +188,18 @@ def unify_table_name(sql_schema: str, table_name: str) -> str:
     return new_schema
 
 
-
 async def register_dataset(
     db: AsyncSession,
     name: str,
     base_url: str,
-    table_name: str
+    table_name: str,
+    session_id: str
 ) -> Dict[str, Any]:
     """
     Register a new dataset and create its table.
     Returns a dictionary that includes all fields needed by DatasetResponse.
     """
+    
     logger.info("Registering dataset: %s", name)
     try:
         # 1) Fetch server metadata
@@ -207,7 +208,7 @@ async def register_dataset(
         # 2) Generate schema via AI
         generated_schema = generate_schema_with_ai(server_metadata)
         
-        # 2a) Unify the AI’s table name with our user-supplied table_name
+        # 2a) Unify the AI's table name with our user-supplied table_name
         fixed_sql = unify_table_name(generated_schema["sql_schema"], table_name)
         generated_schema["sql_schema"] = fixed_sql
 
@@ -265,6 +266,26 @@ async def register_dataset(
             "max_record_count": server_metadata.get("maxRecordCount", 2000)
         }
 
+        # After successfully registering the dataset, create a notification message
+        notification_message = await create_dataset_notification_message(return_config)
+        
+        # Import here to avoid circular imports
+        from ..services.chat_service import create_chat_message
+        from ..schemas.chat import ChatMessageCreate
+        
+        # Store the notification in the current user's chat history
+        system_message = ChatMessageCreate(
+            session_id=session_id,
+            message_type="system",
+            content=notification_message
+        )
+        logger.info("Session ID in register_dataset: %s", session_id)
+        
+        
+        logger.info("Creating system message: %s", system_message)
+        
+        await create_chat_message(db, system_message)
+        
         logger.info("Successfully registered dataset: %s", name)
         return return_config
         
@@ -291,3 +312,48 @@ async def get_dataset_config(db: AsyncSession, table_name: str) -> Optional[Dict
     else:
         logger.warning("No dataset configuration found for table: %s", table_name)
         return None
+
+
+async def create_dataset_notification_message(dataset_config: Dict[str, Any]) -> str:
+    """
+    Create a notification message about a newly added dataset that can be stored in chat history.
+    
+    Args:
+        dataset_config: The dataset configuration with schema information
+        
+    Returns:
+        A formatted message describing the dataset and its schema
+    """
+    # Extract the relevant information from the dataset config
+    name = dataset_config.get("name", "Unknown dataset")
+    table_name = dataset_config.get("table_name", "unknown_table")
+    
+    # Get the schema information - this is the AI-generated schema stored in dataset_configs
+    schema = dataset_config.get("schema", {})
+    schema_sql = schema.get("sql_schema", "No schema available")
+    
+    # Create a formatted message with the dataset information
+    message = f"""
+            SYSTEM: A new dataset has been added: "{name}" (table: {table_name})
+
+            Below is the schema for this dataset:
+            ```sql
+            {schema_sql}
+            ```
+
+            Please consider this dataset when generating SQL queries. You can:
+            - Join with other tables on spatial relationships using ST_Intersects
+            - Include this dataset in analysis when relevant to the user's question
+            - Reference this table as "{table_name}" in your SQL queries
+            
+            Example:
+            The user could ask: "What is the longest road in each street?"
+            You could respond with:
+            SELECT street_name, MAX(shape__length) AS longest_road_length
+            FROM road_data
+            GROUP BY street_name;
+
+            
+            """
+    
+    return message
