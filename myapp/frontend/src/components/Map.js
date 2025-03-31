@@ -2,7 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, ZoomControl, GeoJSON, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { fetchWaterMainGeometries, fetchWaterMainById, fetchWaterMainGeometriesByIds, createFilterToken, fetchWaterMainsByToken } from '../api/api';
+import {
+  fetchWaterMainGeometries,
+  fetchWaterMainById,
+  fetchWaterMainGeometriesByIds,
+  createFilterToken,
+  fetchWaterMainsByToken,
+  // NEW:
+  fetchAllDatasets,
+  fetchDatasetData
+} from '../api/api';
 import ExtraIconsControl from './ExtraIconsControl';
 import ChatWindow from './ChatWindow';
 import LayerControl from './LayerControl';
@@ -35,11 +44,16 @@ function Map() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedWaterMain, setSelectedWaterMain] = useState(null);
-  
+
+  // NEW: store dataset configs and features
+  const [datasets, setDatasets] = useState([]); // an array of {id, name, table_name, ...}
+  const [datasetFeatures, setDatasetFeatures] = useState({}); // {table_name: [Feature, ...]}
+
   // State for layer visibility
   const [layers, setLayers] = useState([
     { id: 'baseMap', name: 'Base Map', visible: true },
     { id: 'waterMains', name: 'Water Mains', visible: true },
+    // We could dynamically add new datasets here, see below
   ]);
 
   // Reference to the map instance
@@ -47,6 +61,7 @@ function Map() {
   const filteredLayerRef = useRef(null);
 
   useEffect(() => {
+    // Existing code to fetch water mains
     const fetchData = async () => {
       try {
         setIsLoading(true);
@@ -76,6 +91,48 @@ function Map() {
     fetchData();
   }, []);
 
+  // NEW: fetch dataset list and their records
+  useEffect(() => {
+    async function loadDatasetsAndData() {
+      try {
+        // 1) get the list of all datasets
+        const all = await fetchAllDatasets(); 
+        setDatasets(all);
+
+        // 2) for each dataset, load its actual records
+        const featsByTable = {};
+        for (const ds of all) {
+          const records = await fetchDatasetData(ds.table_name);
+          // Convert each record's WKT geometry to a GeoJSON Feature
+          const featuresForThisDs = records.map((rec) => {
+            return {
+              type: "Feature",
+              properties: { ...rec }, // store entire row in 'properties'
+              geometry: wktToGeoJSON(rec.geometry)
+            };
+          });
+          featsByTable[ds.table_name] = featuresForThisDs;
+        }
+
+        setDatasetFeatures(featsByTable);
+
+        // Optionally, automatically add these new datasets to your layer control:
+        // If you want each dataset to be toggled on/off separately:
+        const newLayers = all.map(ds => ({
+          id: ds.table_name,
+          name: ds.name || ds.table_name,
+          visible: true,
+        }));
+        setLayers(prev => [...prev, ...newLayers]);
+
+      } catch (err) {
+        console.error("Error loading datasets or data:", err);
+      }
+    }
+
+    loadDatasetsAndData();
+  }, []);
+
   // Function to convert WKT to GeoJSON
   const wktToGeoJSON = (wkt) => {
     if (!wkt) return null;
@@ -83,27 +140,56 @@ function Map() {
     // Basic WKT LINESTRING parser
     // Example: "LINESTRING(-80.123 43.123, -80.124 43.124)"
     try {
-      const match = wkt.match(/LINESTRING\s*\((.*)\)/i);
-      if (!match) return null;
-      
-      const coordinates = match[1].split(',').map(coord => {
-        const [lng, lat] = coord.trim().split(' ').map(parseFloat);
-        return [lng, lat];
-      });
-      
-      return {
-        type: "LineString",
-        coordinates: coordinates
-      };
+      // You can expand this to handle POLYGON, POINT, etc. 
+      // For demonstration, we handle LINESTRING only
+      // (But for your real code, handle the geometry type carefully)
+      const lineMatch = wkt.match(/LINESTRING\s*\((.*)\)/i);
+      if (lineMatch) {
+        const coordinates = lineMatch[1].split(',').map(coord => {
+          const [lng, lat] = coord.trim().split(' ').map(parseFloat);
+          return [lng, lat];
+        });
+        return {
+          type: "LineString",
+          coordinates: coordinates
+        };
+      }
+
+      // If you have polygons, points, etc. handle them here
+      const pointMatch = wkt.match(/POINT\s*\((.*)\)/i);
+      if (pointMatch) {
+        const [lng, lat] = pointMatch[1].trim().split(' ').map(parseFloat);
+        return {
+          type: "Point",
+          coordinates: [lng, lat]
+        };
+      }
+
+      // Example polygon pattern: POLYGON((x1 y1, x2 y2, ...))
+      const polygonMatch = wkt.match(/POLYGON\s*\(\((.*)\)\)/i);
+      if (polygonMatch) {
+        const coords = polygonMatch[1].split(',').map(coord => {
+          const [lng, lat] = coord.trim().split(' ').map(parseFloat);
+          return [lng, lat];
+        });
+        return {
+          type: "Polygon",
+          coordinates: [coords]
+        };
+      }
+
+      // If none matched, fallback
+      console.error("No recognized geometry in WKT:", wkt);
+      return null;
+
     } catch (e) {
-      console.error("Failed to parse WKT:", e);
+      console.error("Failed to parse WKT:", e, wkt);
       return null;
     }
   };
 
   const handleAiChatClick = () => {
     setIsChatOpen((prev) => !prev);
-    // Close layer control when opening chat
     if (!isChatOpen) {
       setIsLayerControlOpen(false);
     }
@@ -111,7 +197,6 @@ function Map() {
 
   const handleLayersClick = () => {
     setIsLayerControlOpen((prev) => !prev);
-    // Close chat when opening layer control
     if (!isLayerControlOpen) {
       setIsChatOpen(false);
     }
@@ -133,7 +218,7 @@ function Map() {
     return layer ? layer.visible : false;
   };
 
-  // Function to handle map filtering based on IDs
+  // Function to handle map filtering based on IDs (existing code)
   const handleFilterMap = async (objectIds, count) => {
     try {
       console.log(`Starting to filter map with ${objectIds.length} IDs`);
@@ -188,25 +273,41 @@ function Map() {
 
     features.forEach(feature => {
       if (feature.geometry && feature.geometry.coordinates) {
-        feature.geometry.coordinates.forEach(coord => {
-          const lng = coord[0];
-          const lat = coord[1];
-          
+        // For a LineString or Polygon, feature.geometry.coordinates 
+        // could be an array of [lng, lat] or array of arrays
+        // This example assumes a simple array of [lng, lat] for lines:
+        if (feature.geometry.type === 'LineString') {
+          feature.geometry.coordinates.forEach(coord => {
+            const [lng, lat] = coord;
+            minLat = Math.min(minLat, lat);
+            maxLat = Math.max(maxLat, lat);
+            minLng = Math.min(minLng, lng);
+            maxLng = Math.max(maxLng, lng);
+          });
+        } else if (feature.geometry.type === 'Polygon') {
+          // For polygon, geometry.coordinates is [ [ [lng, lat], [lng, lat] ... ] ]
+          feature.geometry.coordinates[0].forEach(coord => {
+            const [lng, lat] = coord;
+            minLat = Math.min(minLat, lat);
+            maxLat = Math.max(maxLat, lat);
+            minLng = Math.min(minLng, lng);
+            maxLng = Math.max(maxLng, lng);
+          });
+        } else if (feature.geometry.type === 'Point') {
+          const [lng, lat] = feature.geometry.coordinates;
           minLat = Math.min(minLat, lat);
           maxLat = Math.max(maxLat, lat);
           minLng = Math.min(minLng, lng);
           maxLng = Math.max(maxLng, lng);
-        });
+        }
       }
     });
 
-    // Return Leaflet bounds
     return [[minLat, minLng], [maxLat, maxLng]];
   };
 
   // Clear the filter and show all water mains
   const clearFilter = () => {
-    // Remove the filtered layer from the map if it exists
     if (filteredLayerRef.current && mapRef.current) {
       filteredLayerRef.current.clearLayers();
       mapRef.current.removeLayer(filteredLayerRef.current);
@@ -219,56 +320,34 @@ function Map() {
     setFeatureBounds(null);
   };
 
+  // For Water Mains ONLY
   const onEachFeature = (feature, layer) => {
     if (feature.properties) {
-      // Create a basic popup initially
       const popup = L.popup();
       
-      // When a water main is clicked, fetch detailed information
       layer.on('click', async (e) => {
         try {
-          // Show loading message in popup
           popup.setContent('<div class="popup-loading">Loading details...</div>');
           popup.setLatLng(e.latlng).openOn(layer._map);
           
-          // Fetch detailed water main data
+          // This fetch is for Water Mains only
           const details = await fetchWaterMainById(feature.properties.object_id);
           setSelectedWaterMain(details);
           
-          // Create detailed popup content with the fetched data
           const popupContent = `
             <div class="popup-container">
               <h3>WaterMain Details</h3>
               <table class="popup-table">
-                <tr>
-                  <td><strong>ID:</strong></td>
-                  <td>${details.object_id}</td>
-                </tr>
-                <tr>
-                  <td><strong>Status:</strong></td>
-                  <td>${details.status || 'N/A'}</td>
-                </tr>
-                <tr>
-                  <td><strong>Material:</strong></td>
-                  <td>${details.material || 'N/A'}</td>
-                </tr>
-                <tr>
-                  <td><strong>Pressure Zone:</strong></td>
-                  <td>${details.pressure_zone || 'N/A'}</td>
-                </tr>
-                <tr>
-                  <td><strong>Condition:</strong></td>
-                  <td>${details.condition_score > 0 ? details.condition_score : 'N/A'}</td>
-                </tr>
-                <tr>
-                  <td><strong>Length:</strong></td>
-                  <td>${details.shape_length ? `${details.shape_length.toFixed(2)} m` : 'N/A'}</td>
-                </tr>
+                <tr><td><strong>ID:</strong></td><td>${details.object_id}</td></tr>
+                <tr><td><strong>Status:</strong></td><td>${details.status || 'N/A'}</td></tr>
+                <tr><td><strong>Material:</strong></td><td>${details.material || 'N/A'}</td></tr>
+                <tr><td><strong>Pressure Zone:</strong></td><td>${details.pressure_zone || 'N/A'}</td></tr>
+                <tr><td><strong>Condition:</strong></td><td>${details.condition_score > 0 ? details.condition_score : 'N/A'}</td></tr>
+                <tr><td><strong>Length:</strong></td><td>${details.shape_length ? `${details.shape_length.toFixed(2)} m` : 'N/A'}</td></tr>
               </table>
             </div>
           `;
           
-          // Update the popup with detailed content
           popup.setContent(popupContent);
           popup.update();
         } catch (err) {
@@ -290,13 +369,11 @@ function Map() {
     if (isFiltered && filteredWaterMains.length > 0 && mapRef.current) {
       console.log(`Rendering ${filteredWaterMains.length} filtered water mains on map`);
       
-      // Clear any existing filtered layer
       if (filteredLayerRef.current) {
         filteredLayerRef.current.clearLayers();
         mapRef.current.removeLayer(filteredLayerRef.current);
       }
       
-      // Create a new filtered layer
       filteredLayerRef.current = L.geoJSON(filteredWaterMains, {
         style: {
           color: '#FF4500',
@@ -306,34 +383,99 @@ function Map() {
         onEachFeature: onEachFeature
       }).addTo(mapRef.current);
       
-      // If we have bounds, fit to them
       if (featureBounds) {
         mapRef.current.fitBounds(featureBounds);
       }
     }
   }, [isFiltered, filteredWaterMains, featureBounds]);
 
-  // // Add this effect to scroll when messages change
-  // useEffect(() => {
-  //   const messagesContainer = document.querySelector('.chat-messages'); // Use your actual class name
-  //   if (messagesContainer) {
-  //     messagesContainer.scrollTop = messagesContainer.scrollHeight;
-  //   }
-  // }, [messages]); // Trigger when messages change
-
   const handleAddDatasetClick = () => {
     setIsAddDatasetOpen(true);
-    // Close other panels
     setIsChatOpen(false);
     setIsLayerControlOpen(false);
   };
 
-  const handleDatasetAdded = () => {
-    // Refresh data after a new dataset is added
-    // This is where you would fetch updated datasets
+  // UPDATED: Re-fetch data after a new dataset is added
+  const handleDatasetAdded = async () => {
     console.log('Dataset added successfully');
-    // Optionally reload data or update state as needed
+    // Just re-run the loadDatasetsAndData function from above:
+    // Easiest is to repeat the logic or factor it out into a helper:
+    try {
+      const all = await fetchAllDatasets(); 
+      setDatasets(all);
+
+      const featsByTable = {};
+      for (const ds of all) {
+        const records = await fetchDatasetData(ds.table_name);
+        const featuresForThisDs = records.map((rec) => ({
+          type: "Feature",
+          properties: { ...rec },
+          geometry: wktToGeoJSON(rec.geometry)
+        }));
+        featsByTable[ds.table_name] = featuresForThisDs;
+      }
+      setDatasetFeatures(featsByTable);
+
+      // Optionally re-build the layers array for layer control
+      // (Might want to first remove old dynamic layers or check for duplicates)
+      const newLayers = all.map(ds => ({
+        id: ds.table_name,
+        name: ds.name || ds.table_name,
+        visible: true,
+      }));
+      // Overwrite or merge
+      setLayers([
+        { id: 'baseMap', name: 'Base Map', visible: true },
+        { id: 'waterMains', name: 'Water Mains', visible: true },
+        ...newLayers
+      ]);
+    } catch (e) {
+      console.error("Error re-loading datasets after add:", e);
+    }
   };
+
+
+  function onEachDatasetFeature(feature, layer) {
+    layer.on('click', (e) => {
+      const props = feature.properties || {};
+  
+      // 1) Convert to array of [key, value].
+      // 2) Filter out the geometry field.
+      // 3) Limit to the first 10.
+      const allEntries = Object.entries(props).filter(([k, _]) => k !== "geometry");
+      const firstTen = allEntries.slice(0, 10);
+  
+      // Build a small table in HTML
+      let popupContent = `
+        <div style="font-size: 14px; line-height: 1.4;">
+          <strong>Attributes (showing up to 10)</strong><br/>
+          <table>
+      `;
+  
+      for (const [key, value] of firstTen) {
+        popupContent += `<tr><td>${key}</td><td>${value}</td></tr>`;
+      }
+  
+      // If there are more than 10, let the user know
+      if (allEntries.length > 10) {
+        popupContent += `
+          <tr style="color: #888;">
+            <td colspan="2">
+              ... plus ${allEntries.length - 10} more
+            </td>
+          </tr>
+        `;
+      }
+  
+      popupContent += `</table></div>`;
+  
+      // Bind and open the popup
+      layer.bindPopup(popupContent).openPopup(e.latlng);
+    });
+  }
+  
+  
+
 
   return (
     <div className="map-container">
@@ -377,13 +519,36 @@ function Map() {
               data={feature}
               style={{
                 ...waterMainStyle,
-                color: '#ff4500',  // Highlight filtered features
+                color: '#ff4500',  // highlight filtered features
                 weight: 3
               }}
               onEachFeature={onEachFeature}
             />
           )
         ))}
+
+        {/* Render new datasets from datasetFeatures */}
+        {datasets.map(ds => {
+          if (!getLayerVisibility(ds.table_name)) {
+            return null; 
+          }
+          const feats = datasetFeatures[ds.table_name] || [];
+          return feats.map((feature, idx) => {
+            if (!feature.geometry) return null;
+            return (
+              <GeoJSON
+                key={`${ds.table_name}-${idx}`}
+                data={feature}
+                // You can define a style or onEachFeature if needed
+                style={{
+                  color: '#008000', // just a default color for demonstration
+                  weight: 2
+                }}
+                onEachFeature={onEachDatasetFeature}
+              />
+            );
+          });
+        })}
 
         {/* ZoomToFeatures component will zoom to bounds when they change */}
         {featureBounds && <ZoomToFeatures bounds={featureBounds} />}
