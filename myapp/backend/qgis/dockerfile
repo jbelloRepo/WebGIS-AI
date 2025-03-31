@@ -23,9 +23,9 @@ COPY . /app
 
 # (Optional) If you want to explicitly copy your templates to /app/templates
 # separate from the rest of the code, do so:
-COPY map_templates/watermain_layout.qpt /app/templates/watermain_layout.qpt
+COPY map_templates/watermain_layout_1.qpt /app/templates/watermain_layout_1.qpt
 
 # Start Xvfb and run the script
 CMD Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset & \
     sleep 5 && \
-    python3 script.py
+    python3 qgis_script.py
