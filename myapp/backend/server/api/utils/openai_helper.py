@@ -35,6 +35,9 @@ def generate_sql_from_query(user_query: str, db_schema: str, chat_history: Optio
         "2) Never generate destructive SQL queries (e.g., DROP, DELETE, UPDATE, TRUNCATE, ALTER).\n"
         "3) Only return a single valid SQL query. Do not provide explanations or commentary.\n"
         "4) The SQL should be read-only (SELECT statements or similar).\n"
+        "5) If Shape__Length is present in the ArcGIS metadata, include it as a DOUBLE PRECISION column in the final schema.\n"
+        "6) If Shape__Length exists, always reference it as shape__length (double underscores) — never shape_length.\n"
+        "7) Pay attention to SYSTEM messages in the chat history, especially when they describe new datasets.\n"
     )
 
     # Add chat history to the prompt if available
@@ -49,6 +52,8 @@ def generate_sql_from_query(user_query: str, db_schema: str, chat_history: Optio
         use the context from previous messages to infer what they mean.
         """
 
+    logger.info(f"==History context==: {history_context}")
+    # Add system messages to the prompt if available
     # For show queries, modify prompt to only return object_ids
     if is_show_query:
         user_prompt = f"""
