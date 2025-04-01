@@ -1,70 +1,191 @@
-# Getting Started with Create React App
+# WebGIS-AI Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This directory contains the frontend web application for the WebGIS-AI project, built with React and Leaflet for interactive mapping capabilities.
 
-## Available Scripts
+## Directory Structure
 
-In the project directory, you can run:
+```
+frontend/
+├── public/         # Static files and HTML template
+├── src/            # Source code
+│   ├── api/        # API client and service integrations
+│   │   ├── Map.js            # Main map component with GIS functionality
+│   │   ├── ChatWindow.js     # AI chat interface
+│   │   ├── LayerControl.js   # Map layer management
+│   │   └── ...               # Other UI components
+│   ├── App.js      # Main application component
+│   └── index.js    # Application entry point
+├── .env            # Environment variables
+├── nginx.conf      # Nginx configuration for production
+├── dockerfile      # Docker container definition
+└── package.json    # Dependencies and scripts
+```
 
-### `npm start`
+## Technology Stack
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **React**: Frontend framework for building the user interface
+- **Leaflet**: Interactive mapping library
+- **ESRI Leaflet**: Extensions for integrating ESRI services with Leaflet
+- **Material-UI**: React component library for UI design
+- **Axios**: HTTP client for API requests
+- **Nginx**: Web server for serving the production build
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Features
 
-### `npm test`
+### Interactive Map
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **Base Maps**: Multiple base layers including satellite imagery and topographic maps
+- **Vector Layers**: Display of GIS data as vector overlays
+- **Zoom/Pan Controls**: Standard map navigation capabilities
+- **Home Extent**: Quick return to initial map view
+- **Feature Selection**: Interactive selection of map features
+- **Attribute Display**: View detailed information about selected features
 
-### `npm run build`
+### AI-Powered Chat Interface
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- **Natural Language Queries**: Use plain English to perform spatial analysis
+- **Dynamic SQL Generation**: Backend translates natural language to spatial SQL
+- **Result Visualization**: Automatic visualization of query results on the map
+- **Chat History**: Persistent conversation history
+- **Context-Aware Responses**: Maintains context throughout the conversation
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Data Management
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- **Layer Controls**: Toggle visibility of different data layers
+- **Data Import**: Upload and integrate new GIS datasets
+- **Symbology Control**: Change the appearance of map features
+- **Data Export**: Download analysis results in various formats
 
-### `npm run eject`
+## Setup and Development
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Prerequisites
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- Node.js (v14 or later)
+- npm or yarn
+- Docker (for production builds)
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Local Development
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+1. Install dependencies:
+   ```
+   cd frontend
+   npm install
+   ```
 
-## Learn More
+2. Configure environment variables:
+   ```
+   # Create a .env file with the following variables
+   REACT_APP_API_URL=http://localhost:8000
+   ```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+3. Start the development server:
+   ```
+   npm start
+   ```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+4. Open your browser to `http://localhost:3000`
 
-### Code Splitting
+### Building for Production
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+1. Create an optimized production build:
+   ```
+   npm run build
+   ```
 
-### Analyzing the Bundle Size
+2. The build artifacts will be in the `build/` directory
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+3. Using Docker:
+   ```
+   docker build -t webgis-ai-frontend .
+   docker run -p 80:80 webgis-ai-frontend
+   ```
 
-### Making a Progressive Web App
+## Component Overview
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### Map Component
 
-### Advanced Configuration
+The core map component (`Map.js`) provides:
+- Integration with Leaflet and ESRI Leaflet
+- Layer management
+- Event handling for user interactions
+- Coordinate system management
+- Dynamic styling of geographic features
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### ChatWindow Component
 
-### Deployment
+The AI chat interface (`ChatWindow.js`) provides:
+- User input handling
+- Communication with backend AI services
+- Message rendering
+- Context management for continuing conversations
+- Integration with map for query results visualization
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+### Layer Controls
 
-### `npm run build` fails to minify
+Layer management components allow users to:
+- Toggle layer visibility
+- Adjust layer opacity
+- Change rendering order
+- Access metadata about layers
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Testing
+
+Run the test suite:
+
+```
+npm test
+```
+
+The project uses Jest and React Testing Library for unit and integration tests.
+
+## Browser Compatibility
+
+The application is optimized for:
+- Chrome (latest 2 versions)
+- Firefox (latest 2 versions)
+- Edge (latest 2 versions)
+- Safari (latest 2 versions)
+
+## Performance Considerations
+
+- Map rendering is optimized for large datasets using clustering and simplification
+- Images and assets are optimized for web delivery
+- Code-splitting is used to minimize initial load time
+- React component memoization is used where appropriate
+
+## Contributing
+
+When working on the frontend:
+
+1. Follow established React patterns and project structure
+2. Use functional components with hooks
+3. Document components with JSDoc comments
+4. Write tests for new components and features
+5. Use the existing styling approach for consistency
+6. Ensure responsive design for all screen sizes
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Map not displaying**
+   - Check browser console for errors
+   - Verify that Leaflet CSS is properly loaded
+   - Ensure map container has a defined height
+
+2. **API connection errors**
+   - Verify backend is running
+   - Check CORS configuration
+   - Confirm API URL in environment variables
+
+3. **Layer visibility issues**
+   - Check layer z-index settings
+   - Verify data is properly loaded
+   - Test map bounds to ensure data is in view
+
+## Additional Resources
+
+- [React Documentation](https://reactjs.org/docs/getting-started.html)
+- [Leaflet Documentation](https://leafletjs.com/reference.html)
+- [Material-UI Documentation](https://mui.com/getting-started/usage/)
+- [PostGIS Documentation](https://postgis.net/docs/) (helpful for understanding spatial data)
