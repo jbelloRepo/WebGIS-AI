@@ -1,5 +1,30 @@
 # WebGIS-AI
 
+## Table of Contents
+- [System Architecture](#system-architecture)
+- [Chat Service](#chat-service)
+- [Innovation Overview](#innovation-overview)
+- [Significance](#significance)
+- [Impact](#impact)
+- [Benefits and Results](#benefits-and-results)
+- [Key Features](#key-features)
+  - [Map Controls](#map-controls)
+  - [AI Chat Integration](#ai-chat-integration)
+  - [Advanced Capabilities](#advanced-capabilities)
+- [Feature Demonstrations](#feature-demonstrations)
+  - [Map Controls](#map-controls-1)
+  - [AI-Powered Features](#ai-powered-features)
+- [System Architecture](#system-architecture-1)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Technologies Used](#technologies-used)
+- [PostGIS Functions](#postgis-functions)
+  - [Basic Functions](#basic-functions)
+  - [Spatial Relationship Functions](#spatial-relationship-functions)
+- [Contributing](#contributing)
+- [License](#license)
+- [Contact](#contact)
+
 ## System Architecture
 
 ![System Architecture](system_arch.png)
