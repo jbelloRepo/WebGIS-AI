@@ -96,8 +96,7 @@ Real-world applications demonstrate:
 | Feature | Demonstration |
 |---------|---------------|
 | **Homepage UI** | ![Homepage](gifs/homepage_ui.gif) |
-| **Zoom In/Out** | ![Zoom Controls](gifs/zoom_demo.gif) |
-| **Zoom to Home Extent** | ![Home Extent](gifs/home_extent.gif) |
+| **Map Navigation** | ![Map Navigation](gifs/map_navigation.gif) |
 | **Toggle Layers** | ![Layer Toggle](gifs/layer_toggle.gif) |
 | **Feature Attributes** | ![Feature Info](gifs/feature_info.gif) |
 
