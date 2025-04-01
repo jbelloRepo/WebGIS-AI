@@ -89,6 +89,27 @@ Real-world applications demonstrate:
 - **Spatial Analysis**: Perform complex spatial operations and queries
 - **Custom Visualization**: Create tailored maps and data representations
 
+## Feature Demonstrations
+
+### Map Controls
+
+| Feature | Demonstration |
+|---------|---------------|
+| **Homepage UI** | ![Homepage](gifs/homepage_ui.gif) |
+| **Zoom In/Out** | ![Zoom Controls](gifs/zoom_demo.gif) |
+| **Zoom to Home Extent** | ![Home Extent](gifs/home_extent.gif) |
+| **Toggle Layers** | ![Layer Toggle](gifs/layer_toggle.gif) |
+| **Feature Attributes** | ![Feature Info](gifs/feature_info.gif) |
+
+### AI-Powered Features
+
+| Feature | Demonstration |
+|---------|---------------|
+| **Natural Language Queries** | ![AI Queries](gifs/ai_query.gif) |
+| **Data Enrichment** | ![Data Enrichment](gifs/data_enrichment.gif) |
+| **Dynamic Visualization** | ![Dynamic Visualization](gifs/dynamic_viz.gif) |
+| **Dynamic Data Ingestion** | ![Data Ingestion](gifs/data_ingestion.gif) |
+
 ## System Architecture
 
 WebGIS-AI consists of several microservices:
