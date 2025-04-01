@@ -133,6 +133,7 @@ Real-world applications demonstrate:
 | **Data Enrichment** | ![Data Enrichment](gifs/data_enrichment.gif) |
 | **Dynamic Visualization** | ![Dynamic Visualization](gifs/dynamic_viz.gif) |
 | **Dynamic Data Ingestion** | ![Data Ingestion](gifs/data_ingestion.gif) |
+| **Spatial Queries** | ![Spatial Queries](gifs/spatial_queries.gif) |
 
 ## System Architecture
 
