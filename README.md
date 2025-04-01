@@ -2,9 +2,27 @@
 
 ## System Architecture
 
-![System Architecture](diagram-export-3-31-2025-11_59_57-AM.png)
+![System Architecture](system_arch.png)
 
 The WebGIS-AI architecture employs a containerized microservice approach using Docker. The frontend consists of a React UI served through Nginx. The backend includes FastAPI for API handling, a dedicated Chat Service for natural language processing, SQL Executor for database operations, and a GIS Data Scraper for external data collection. Data is stored in PostgreSQL with Redis for caching and a separate Chat History store. The system integrates with external services including the OpenAI API for natural language processing and various GIS REST APIs for geospatial data acquisition. This modular design ensures scalability, maintainability, and efficient data flow between components.
+
+## Chat Service
+
+![Chat Service](chat_service.png)
+
+### Bridging Language and Technology in Spatial Queries
+
+The Chat Service lies at the heart of WebGIS-AI's innovative approach, transforming how users interact with geospatial data:
+
+1. **Natural Language Input**: Users express their queries in everyday language, making complex spatial analysis accessible to non-specialists.
+
+2. **Transformation Process**: The system intelligently converts natural language into structured query logic through AI processing.
+
+3. **Spatial Query Code**: Natural language is transformed into executable spatial SQL, leveraging PostGIS capabilities.
+
+4. **Execution**: The system processes these queries against the spatial database, returning results in visually meaningful formats.
+
+This workflow eliminates the need for specialized SQL knowledge, democratizing access to powerful geospatial analytics.
 
 ## Innovation Overview
 
